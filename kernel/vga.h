@@ -25,11 +25,24 @@
 #define VGA_COLOR_LIGHT_BROWN   14
 #define VGA_COLOR_WHITE         15
 
+// Port I/O for cursor
+static inline void outb(uint16_t port, uint8_t val) {
+    __asm__ volatile("outb %0, %1" : : "a"(val), "Nd"(port));
+}
+
+static inline uint8_t inb(uint16_t port) {
+    uint8_t ret;
+    __asm__ volatile("inb %1, %0" : "=a"(ret) : "Nd"(port));
+    return ret;
+}
+
 void vga_init(void);
 void vga_clear(void);
 void vga_putchar(char c);
 void vga_puts(const char* str);
 void vga_setcolor(uint8_t color);
 void vga_printf(const char* format, ...);
+void vga_scroll(void);
+void vga_update_cursor(void);
 
 #endif
