@@ -1,35 +1,73 @@
 #include "vga.h"
 #include "gdt.h"
 #include "idt.h"
+#include "isr.h"
+#include "shell.h"
+#include "../drivers/keyboard.h"
+#include "../drivers/timer.h"
 
 void kernel_main(void) {
-    // Initialize VGA
+    // Initialize VGA first so we can see output
     vga_init();
     vga_setcolor(VGA_COLOR_LIGHT_GREEN | (VGA_COLOR_BLACK << 4));
     
-    // Welcome message
+    // Welcome banner
     vga_puts("========================================\n");
-    vga_puts("        Welcome to Kimi-OS v0.1\n");
+    vga_puts("        Welcome to Kimi-OS v0.2\n");
     vga_puts("        Built with GitHub Actions\n");
     vga_puts("========================================\n\n");
     
     vga_setcolor(VGA_COLOR_LIGHT_GREY | (VGA_COLOR_BLACK << 4));
-    vga_puts("Initializing GDT... ");
+    
+    // Initialize GDT
+    vga_puts("[*] Initializing GDT... ");
     gdt_init();
-    vga_puts("[OK]\n");
+    vga_setcolor(VGA_COLOR_LIGHT_GREEN | (VGA_COLOR_BLACK << 4));
+    vga_puts("OK\n");
+    vga_setcolor(VGA_COLOR_LIGHT_GREY | (VGA_COLOR_BLACK << 4));
     
-    vga_puts("Initializing IDT... ");
+    // Initialize IDT
+    vga_puts("[*] Initializing IDT... ");
     idt_init();
-    vga_puts("[OK]\n");
+    vga_setcolor(VGA_COLOR_LIGHT_GREEN | (VGA_COLOR_BLACK << 4));
+    vga_puts("OK\n");
+    vga_setcolor(VGA_COLOR_LIGHT_GREY | (VGA_COLOR_BLACK << 4));
     
-    vga_puts("\nSystem ready. This is a bare-bones OS kernel.\n");
-    vga_puts("Running in 32-bit protected mode.\n\n");
+    // Initialize ISRs and IRQs
+    vga_puts("[*] Initializing ISRs... ");
+    isr_init();
+    vga_setcolor(VGA_COLOR_LIGHT_GREEN | (VGA_COLOR_BLACK << 4));
+    vga_puts("OK\n");
+    vga_setcolor(VGA_COLOR_LIGHT_GREY | (VGA_COLOR_BLACK << 4));
     
-    vga_setcolor(VGA_COLOR_LIGHT_CYAN | (VGA_COLOR_BLACK << 4));
-    vga_puts("Commands: None yet! This is just the beginning.\n");
+    // Initialize timer
+    vga_puts("[*] Initializing Timer (100Hz)... ");
+    timer_init(TIMER_FREQ);
+    register_interrupt_handler(32, timer_handler);
+    vga_setcolor(VGA_COLOR_LIGHT_GREEN | (VGA_COLOR_BLACK << 4));
+    vga_puts("OK\n");
+    vga_setcolor(VGA_COLOR_LIGHT_GREY | (VGA_COLOR_BLACK << 4));
     
-    // Hang - we don't have multitasking yet
+    // Initialize keyboard
+    vga_puts("[*] Initializing Keyboard... ");
+    keyboard_init();
+    register_interrupt_handler(33, keyboard_handler);
+    vga_setcolor(VGA_COLOR_LIGHT_GREEN | (VGA_COLOR_BLACK << 4));
+    vga_puts("OK\n");
+    vga_setcolor(VGA_COLOR_LIGHT_GREY | (VGA_COLOR_BLACK << 4));
+    
+    // Enable interrupts
+    vga_puts("[*] Enabling Interrupts... ");
+    __asm__ volatile("sti");
+    vga_setcolor(VGA_COLOR_LIGHT_GREEN | (VGA_COLOR_BLACK << 4));
+    vga_puts("OK\n\n");
+    
+    // Start shell
+    vga_setcolor(VGA_COLOR_WHITE | (VGA_COLOR_BLACK << 4));
+    shell_run();
+    
+    // Should never reach here
     while (1) {
-        __asm__ volatile ("hlt");
+        __asm__ volatile("hlt");
     }
 }
