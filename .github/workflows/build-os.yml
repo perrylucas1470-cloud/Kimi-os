@@ -1,0 +1,94 @@
+name: Build Kimi-OS
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y nasm qemu-system-x86 gcc make grub2-common xorriso
+
+    - name: Build cross-compiler (i686-elf-gcc)
+      run: |
+        # Download and build binutils
+        export PREFIX="$HOME/opt/cross"
+        export TARGET=i686-elf
+        export PATH="$PREFIX/bin:$PATH"
+        
+        mkdir -p $PREFIX
+        
+        # Build binutils
+        wget https://ftp.gnu.org/gnu/binutils/binutils-2.41.tar.xz
+        tar -xf binutils-2.41.tar.xz
+        mkdir build-binutils
+        cd build-binutils
+        ../binutils-2.41/configure --target=$TARGET --prefix="$PREFIX" --with-sysroot --disable-nls --disable-werror
+        make -j$(nproc)
+        make install
+        cd ..
+        
+        # Build GCC
+        wget https://ftp.gnu.org/gnu/gcc/gcc-13.2.0/gcc-13.2.0.tar.xz
+        tar -xf gcc-13.2.0.tar.xz
+        mkdir build-gcc
+        cd build-gcc
+        ../gcc-13.2.0/configure --target=$TARGET --prefix="$PREFIX" --disable-nls --enable-languages=c,c++ --without-headers
+        make -j$(nproc) all-gcc
+        make -j$(nproc) all-target-libgcc
+        make install-gcc
+        make install-target-libgcc
+        cd ..
+
+    - name: Build OS
+      run: |
+        export PATH="$HOME/opt/cross/bin:$PATH"
+        make clean
+        make
+
+    - name: Upload ISO artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: kimi-os-iso
+        path: build/kimi-os.iso
+        retention-days: 30
+
+    - name: Test with QEMU
+      run: |
+        timeout 10 qemu-system-i386 -cdrom build/kimi-os.iso -serial stdio -display none -m 256 || true
+
+  deploy-aws:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Download artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: kimi-os-iso
+        path: ./iso
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+    
+    - name: Upload to S3
+      run: |
+        aws s3 cp ./iso/kimi-os.iso s3://${{ secrets.AWS_S3_BUCKET }}/kimi-os-${{ github.sha }}.iso
+        aws s3 cp ./iso/kimi-os.iso s3://${{ secrets.AWS_S3_BUCKET }}/kimi-os-latest.iso
+        echo "OS uploaded to S3: kimi-os-${{ github.sha }}.iso"
