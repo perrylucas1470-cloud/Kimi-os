@@ -5,7 +5,7 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
-  workflow_dispatch:  # Manual trigger
+  workflow_dispatch:
 
 jobs:
   build:
@@ -18,11 +18,11 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y nasm qemu-system-x86 gcc make grub2-common xorriso
+        sudo apt-get install -y nasm qemu-system-x86 gcc make grub2-common xorriso \
+          build-essential bison flex libgmp3-dev libmpc-dev libmpfr-dev texinfo
 
     - name: Build cross-compiler (i686-elf-gcc)
       run: |
-        # Download and build binutils
         export PREFIX="$HOME/opt/cross"
         export TARGET=i686-elf
         export PATH="$PREFIX/bin:$PATH"
@@ -30,7 +30,7 @@ jobs:
         mkdir -p $PREFIX
         
         # Build binutils
-        wget https://ftp.gnu.org/gnu/binutils/binutils-2.41.tar.xz
+        wget -q https://ftp.gnu.org/gnu/binutils/binutils-2.41.tar.xz
         tar -xf binutils-2.41.tar.xz
         mkdir build-binutils
         cd build-binutils
@@ -39,9 +39,15 @@ jobs:
         make install
         cd ..
         
-        # Build GCC
-        wget https://ftp.gnu.org/gnu/gcc/gcc-13.2.0/gcc-13.2.0.tar.xz
+        # Build GCC with prerequisites
+        wget -q https://ftp.gnu.org/gnu/gcc/gcc-13.2.0/gcc-13.2.0.tar.xz
         tar -xf gcc-13.2.0.tar.xz
+        
+        # Download GMP, MPFR, MPC automatically
+        cd gcc-13.2.0
+        ./contrib/download_prerequisites
+        cd ..
+        
         mkdir build-gcc
         cd build-gcc
         ../gcc-13.2.0/configure --target=$TARGET --prefix="$PREFIX" --disable-nls --enable-languages=c,c++ --without-headers
@@ -55,7 +61,7 @@ jobs:
       run: |
         export PATH="$HOME/opt/cross/bin:$PATH"
         make clean
-        make
+        make iso
 
     - name: Upload ISO artifact
       uses: actions/upload-artifact@v4
