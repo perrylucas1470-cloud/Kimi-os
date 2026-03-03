@@ -1,5 +1,5 @@
 #include "isr.h"
-#include "idt.h"
+#include "idt.h"        // ADD THIS LINE
 #include "vga.h"
 #include "../kernel/port.h"
 
