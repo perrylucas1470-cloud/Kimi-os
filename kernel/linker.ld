@@ -25,4 +25,7 @@ SECTIONS
         *(COMMON)
         *(.bss)
     }
+    
+    /* Define end symbol for memory tracking */
+    end = .;
 }
