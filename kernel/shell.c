@@ -102,8 +102,8 @@ static void cmd_about(void) {
 }
 
 static void cmd_mem(void) {
-    extern uint32_t end;
-    vga_printf("Kernel end address: 0x%x\n", &end);
+    extern char end;
+    vga_printf("Kernel end address: 0x%x\n", (uint32_t)&end);
     vga_printf("Approximate memory used: %d KB\n", ((uint32_t)&end - 0x100000) / 1024);
 }
 
