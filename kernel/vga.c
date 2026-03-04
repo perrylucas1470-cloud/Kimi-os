@@ -1,6 +1,5 @@
 #include "vga.h"
 #include "../libc/string.h"
-#include <stdarg.h>
 
 static uint16_t* vga_buffer = (uint16_t*)VGA_ADDRESS;
 static uint8_t vga_color = VGA_COLOR_LIGHT_GREY | (VGA_COLOR_BLACK << 4);
@@ -88,15 +87,20 @@ void vga_update_cursor(void) {
 static void itoa(int value, char* str, int base) {
     char* ptr = str, *ptr1 = str, tmp_char;
     int tmp_value;
+    int is_negative = 0;
+    
+    if (value < 0 && base == 10) {
+        is_negative = 1;
+        value = -value;
+    }
     
     do {
         tmp_value = value;
         value /= base;
-        *ptr++ = "zyxwvutsrqponmlkjihgfedcba9876543210123456789abcdefghijklmnopqrstuvwxyz"[35 + (tmp_value - value * base)];
+        *ptr++ = "0123456789abcdef"[tmp_value - value * base];
     } while (value);
     
-    // Apply negative sign
-    if (tmp_value < 0) *ptr++ = '-';
+    if (is_negative) *ptr++ = '-';
     *ptr-- = '\0';
     
     // Reverse string
@@ -107,37 +111,41 @@ static void itoa(int value, char* str, int base) {
     }
 }
 
+// Simple printf - only supports %s, %d, %x, %c, %%
 void vga_printf(const char* format, ...) {
-    va_list args;
-    va_start(args, format);
+    // Get variadic arguments manually
+    char** arg = (char**)&format;
+    arg++;  // Move to first argument after format
     
     char buffer[32];
     char* str;
     int num;
+    char c;
     
     while (*format) {
         if (*format == '%' && *(format + 1)) {
             format++;
             switch (*format) {
                 case 's':
-                    str = va_arg(args, char*);
+                    str = *arg++;
                     vga_puts(str ? str : "(null)");
                     break;
                 case 'd':
                 case 'i':
-                    num = va_arg(args, int);
+                    num = *((int*)arg++);
                     itoa(num, buffer, 10);
                     vga_puts(buffer);
                     break;
                 case 'x':
                 case 'X':
-                    num = va_arg(args, int);
+                    num = *((int*)arg++);
                     itoa(num, buffer, 16);
                     vga_puts("0x");
                     vga_puts(buffer);
                     break;
                 case 'c':
-                    vga_putchar((char)va_arg(args, int));
+                    c = *((char*)arg++);
+                    vga_putchar(c);
                     break;
                 case '%':
                     vga_putchar('%');
@@ -152,6 +160,4 @@ void vga_printf(const char* format, ...) {
         }
         format++;
     }
-    
-    va_end(args);
 }
